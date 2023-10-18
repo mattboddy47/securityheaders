@@ -74,10 +74,10 @@ class SecurityHeaders():
         'x-aspnet-version',
     ]
 
-    def __init__(self, url, max_redirects=2, no_check_certificate=False):
-        parsed = urlparse(url)
+    def __init__(self, input_url, max_redirects=2, no_check_certificate=False):
+        parsed = urlparse(input_url)
         if not parsed.scheme and not parsed.netloc:
-            url = "{}://{}".format(DEFAULT_URL_SCHEME, url)
+            url = "{}://{}".format(DEFAULT_URL_SCHEME, input_url)
             parsed = urlparse(url)
             if not parsed.scheme and not parsed.netloc:
                 raise InvalidTargetURL("Unable to parse the URL")
@@ -91,7 +91,7 @@ class SecurityHeaders():
         self.headers = None
 
         if self.max_redirects:
-            self.target_url = self._follow_redirect_until_response(url, self.max_redirects)
+            self.target_url = self._follow_redirect_until_response(input_url, self.max_redirects)
         else:
             self.target_url = parsed
 
@@ -221,17 +221,17 @@ class SecurityHeaders():
         return retval
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Check HTTP security headers',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('url', metavar='URL', type=str, help='Target URL')
-    parser.add_argument('--max-redirects', dest='max_redirects', metavar='N', default=2, type=int,
-                        help='Max redirects, set 0 to disable')
-    parser.add_argument('--no-check-certificate', dest='no_check_certificate', action='store_true',
-                        help='Do not verify TLS certificate chain')
-    args = parser.parse_args()
+def print_output_to_text_file(output_file):
+    if not output_file:
+        return
+    import sys
+    sys.stdout = open("./output.txt", "w")
+
+
+def perform_header_check(url, args):
+    print("************************ Performing header check for : ", url, " ************************")
     try:
-        header_check = SecurityHeaders(args.url, args.max_redirects, args.no_check_certificate)
+        header_check = SecurityHeaders(url, args.max_redirects, args.no_check_certificate)
         header_check.fetch_headers()
         headers = header_check.check_headers()
     except SecurityHeadersException as e:
@@ -271,3 +271,28 @@ if __name__ == "__main__":
         utils.print_ok("HTTP -> HTTPS redirect")
     else:
         utils.print_warning("HTTP -> HTTPS redirect")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Check HTTP security headers',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--url', metavar='URL', type=str, help='Target URL')
+    parser.add_argument('--max-redirects', dest='max_redirects', metavar='N', default=2, type=int,
+                        help='Max redirects, set 0 to disable')
+    parser.add_argument('--no-check-certificate', dest='no_check_certificate', action='store_true',
+                        help='Do not verify TLS certificate chain')
+    parser.add_argument('--list-urls', dest='url_list', metavar='L', type=str,
+                        help='use this option to point the script to a file containing a list of all urls')
+    parser.add_argument('--to-output-file', metavar='F', dest='output_file', type=str,
+                        help='provide the file path for the output')
+    args = parser.parse_args()
+
+    print_output_to_text_file(args.output_file)
+
+    if args.url_list:
+        with open(args.url_list) as f:
+            urls = f.read().splitlines()
+            for url in urls:
+                perform_header_check(url, args)
+    else:
+        perform_header_check(args.url, args)
